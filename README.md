@@ -24,7 +24,7 @@ DIGICERT_SIGNATURE_HASH = 'sha256'
 
 Deploy and install the files. For example using Docker, you can add the
 following lines to your Dockerfile:
-```python
+```dockerfile
 # Install DigiCert Plugin
 ADD lemur_digicert /usr/local/src/lemur/lemur_digicert
 RUN cd /usr/local/src/lemur/lemur_digicert &&\
