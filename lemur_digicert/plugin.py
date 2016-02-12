@@ -252,10 +252,10 @@ class DigiCertIssuerPlugin(IssuerPlugin):
 
         order_info = self.get_order_info(order_id)
         waited = 0
-        while (order_info['status'] != 'issued') and (waited < 60):
-            time.sleep(5)
-            waited += 5
-            current_app.logger.info("waiting for cert issuance; sleeping 5s")
+        while (order_info['status'] != 'issued') and (waited < 600):
+            time.sleep(10)
+            waited += 10
+            current_app.logger.info("waiting for cert issuance; sleeping 10s")
             order_info = self.get_order_info(order_id)
 
         # get certID from order

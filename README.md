@@ -22,13 +22,20 @@ DIGICERT_CA_CERT_ID = (only required for PRIVATE_SSL_PLUS)
 DIGICERT_SIGNATURE_HASH = 'sha256'
 ```
 
-Deploy and install the files. For example using Docker, you can add the
+Deploy and install the files. For example, using Docker, you can add the
 following lines to your Dockerfile:
 ```dockerfile
 # Install DigiCert Plugin
 ADD lemur_digicert /usr/local/src/lemur/lemur_digicert
 RUN cd /usr/local/src/lemur/lemur_digicert &&\
   pip install -e .
+```
+
+You may also want to adjust the timeout value when starting the API, since
+DigiCert occasionally takes several minutes to process the cert request
+before allowing download. We have ours set to 10 minutes:
+```python
+python manage.py start --timeout 600 ...
 ```
 
 Go to the Authorities section of Lemur and add a new entry for DigiCert, choosing
