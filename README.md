@@ -34,7 +34,7 @@ RUN cd /usr/local/src/lemur/lemur_digicert &&\
 You may also want to adjust the timeout value when starting the API, since
 DigiCert occasionally takes several minutes to process the cert request
 before allowing download. We have ours set to 10 minutes:
-```python
+```bash
 python manage.py start --timeout 600 ...
 ```
 
