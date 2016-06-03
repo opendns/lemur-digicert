@@ -37,7 +37,7 @@ def process_options(options, csr):
     data = {
         "certificate":
             {
-                "common_name": options['commonName'],
+                "common_name": options['common_name'],
                 "csr": csr,
                 "signature_hash":
                     current_app.config.get("DIGICERT_SIGNATURE_HASH"),
@@ -58,16 +58,20 @@ def process_options(options, csr):
                 current_app.config.get("DIGICERT_CA_CERT_ID")
 
     # add SANs if present
-    if options.get('extensions', 'subAltNames'):
+    if options.get('extensions', 'sub_alt_names'):
         dns_names = []
-        for san in options['extensions']['subAltNames']['names']:
+        for san in options['extensions']['sub_alt_names']['names']:
             dns_names.append(str(san['value']))
 
         data['certificate']['dns_names'] = dns_names
 
-    if options.get('validityEnd'):
+    if options.get('validity_end'):
         end_date, period = get_default_issuance(options)
         data['validity_years'] = period
+
+    elif options.get('validity_years'):
+        if options['validity_years'] not in [1, 2, 3]:
+            raise Exception("Digicert issued certificates cannot exceed two years in validity")
 
     return data
 
@@ -78,11 +82,11 @@ def get_default_issuance(options):
     :param options:
     :return:
     """
-    end_date = arrow.get(options['validityEnd'])
+    end_date = arrow.get(options['validity_end'])
     specific_end_date = end_date.replace(days=-1).format("MM/DD/YYYY")
 
     now = arrow.utcnow()
-    then = arrow.get(options['validityEnd'])
+    then = arrow.get(options['validity_end'])
 
     if then < now.replace(years=+1):
         validity_period = '1'
@@ -146,7 +150,7 @@ class DigiCertIssuerPlugin(IssuerPlugin):
         if current_app.config.get("DIGICERT_REQUEST_TYPE") == \
                 'PRIVATE_SSL_PLUS':
             # with SANs
-            if issuer_options.get('extensions', 'subAltNames'):
+            if issuer_options.get('extensions', 'sub_alt_names'):
                 current_app.logger.info("subAltNames found")
                 order_url = '/order/certificate/private_ssl_multi_domain'
             # without SANs
@@ -155,7 +159,7 @@ class DigiCertIssuerPlugin(IssuerPlugin):
         # Public SSL Certs
         elif current_app.config.get("DIGICERT_REQUEST_TYPE") == 'SSL_PLUS':
             # with SANs
-            if issuer_options.get('extensions', 'subAltNames'):
+            if issuer_options.get('extensions', 'sub_alt_names'):
                 current_app.logger.info("subAltNames found")
                 order_url = '/order/certificate/ssl_multi_domain'
             # without SANs
