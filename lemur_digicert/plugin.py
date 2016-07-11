@@ -141,7 +141,7 @@ class DigiCertIssuerPlugin(IssuerPlugin):
     def request_certificate(self, issuer_options, csr):
         """Submits a certificate request"""
         # decide which API endpoint to use based on Private vs Public cert
-
+        san_cert = False       # Used to idicate we need a SAN cert or not
         # Private SSL Certs
         if current_app.config.get("DIGICERT_REQUEST_TYPE") == \
                 'PRIVATE_SSL_PLUS':
@@ -155,11 +155,15 @@ class DigiCertIssuerPlugin(IssuerPlugin):
         # Public SSL Certs
         elif current_app.config.get("DIGICERT_REQUEST_TYPE") == 'SSL_PLUS':
             # with SANs
-            if issuer_options.get('extensions', 'subAltNames'):
-                current_app.logger.info("subAltNames found")
-                order_url = '/order/certificate/ssl_multi_domain'
+            subAltNames = issuer_options.get('extensions', 'subAltName')
+            if subAltNames:
+                if 'names' in subAltNames.keys():
+                    if len(subAltNames['names']) > 0:
+                        san_cert = True
+                        current_app.logger.info("subAltNames found")
+                        order_url = '/order/certificate/ssl_multi_domain'
             # without SANs
-            else:
+            if not san_cert:
                 order_url = '/order/certificate/ssl_plus'
         else:
             raise Exception("Invalid DIGICERT_REQUEST_TYPE: {0}".format(
