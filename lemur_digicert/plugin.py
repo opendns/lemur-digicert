@@ -141,7 +141,6 @@ class DigiCertIssuerPlugin(IssuerPlugin):
     def request_certificate(self, issuer_options, csr):
         """Submits a certificate request"""
         # decide which API endpoint to use based on Private vs Public cert
-        san_cert = False       # Used to idicate we need a SAN cert or not
         # Private SSL Certs
         if current_app.config.get("DIGICERT_REQUEST_TYPE") == \
                 'PRIVATE_SSL_PLUS':
@@ -155,6 +154,7 @@ class DigiCertIssuerPlugin(IssuerPlugin):
         # Public SSL Certs
         elif current_app.config.get("DIGICERT_REQUEST_TYPE") == 'SSL_PLUS':
             # with SANs
+            san_cert = False       # Used to indicate SAN certificate
             subAltNames = issuer_options.get('extensions', 'subAltName')
             if subAltNames:
                 if 'names' in subAltNames.keys():
