@@ -10,7 +10,6 @@
 """
 import arrow
 import requests
-from requests.auth import HTTPBasicAuth
 
 from flask import current_app
 
@@ -29,6 +28,7 @@ def process_options(options, csr):
     """Set the incoming issuer options to DigiCert fields/options.
 
     :param options:
+    :param csr:
     :return: dict or valid DigiCert options
     """
     current_app.logger.info("csr: {0}".format(csr))
@@ -140,45 +140,22 @@ class DigiCertIssuerPlugin(IssuerPlugin):
 
     def request_certificate(self, issuer_options, csr):
         """Submits a certificate request"""
-        # decide which API endpoint to use based on Private vs Public cert
-        # Private SSL Certs
-        if current_app.config.get("DIGICERT_REQUEST_TYPE") == \
-                'PRIVATE_SSL_PLUS':
-            # with SANs
-            if issuer_options.get('extensions', 'subAltNames'):
-                current_app.logger.info("subAltNames found")
-                order_url = '/order/certificate/private_ssl_multi_domain'
-            # without SANs
-            else:
-                order_url = '/order/certificate/private_ssl_plus'
-        # Public SSL Certs
-        elif current_app.config.get("DIGICERT_REQUEST_TYPE") == 'SSL_PLUS':
-            # with SANs
-            san_cert = False       # Used to indicate SAN certificate
-            subAltNames = issuer_options.get('extensions', 'subAltName')
-            if subAltNames:
-                if 'names' in subAltNames.keys():
-                    if len(subAltNames['names']) > 0:
-                        san_cert = True
-                        current_app.logger.info("subAltNames found")
-                        order_url = '/order/certificate/ssl_multi_domain'
-            # without SANs
-            if not san_cert:
-                order_url = '/order/certificate/ssl_plus'
-        else:
-            raise Exception("Invalid DIGICERT_REQUEST_TYPE: {0}".format(
-                current_app.config.get("DIGICERT_REQUEST_TYPE")))
 
-        # figure out issuer options based on the CSR
-        url = current_app.config.get("DIGICERT_URL") + order_url
+        # Build the proper API-URL for digicert
+        request_type = current_app.config.get("DIGICERT_REQUEST_TYPE")
+        digicert_url = current_app.config.get("DIGICERT_URL")
+        sub_alt_name = issuer_options.get('extensions', 'subAltName')
+        url = self.build_request_url(request_type, sub_alt_name, digicert_url)
+
         data = process_options(issuer_options, csr)
         headers = {
             'X-DC-DEVKEY': current_app.config.get('DIGICERT_API_KEY'),
             'Content-Type': 'application/json',
         }
 
-        response = self.session.post(
-            url, data=json.dumps(data), headers=headers)
+        response = self.session.post(url, 
+                                     data=json.dumps(data),
+                                     headers=headers)
         current_app.logger.info("response.text: {0}".format(response.text))
         current_app.logger.info("response.json: {0}".format(response.json))
 
@@ -286,3 +263,64 @@ class DigiCertIssuerPlugin(IssuerPlugin):
         """
         role = {'username': '', 'password': '', 'name': 'digicert'}
         return constants.DIGICERT_ROOT, "", [role]
+
+    @staticmethod
+    def build_request_url(request_type, sub_alt_names, digicert_url):
+        """Build the order request url.
+
+        Create the correct URL for the Digicert API call for Requests.
+        This is a string formatting method and is used only to build the
+        certificate request end point URL for the API depending on the
+        certificate that was was requested from the caller.
+
+        :param request_type:
+        :param sub_alt_names:
+        :param digicert_url:
+        :return: string representation of DigiCert API endpoint for order.
+        """
+
+        # Decide which API endpoint to use based on Private vs Public cert
+        # Private SSL Certs
+        if 'PRIVATE_SSL_PLUS' in request_type:
+            private_cert = True
+        elif 'SSL_PLUS' in request_type:
+            private_cert = False
+        else:
+            raise Exception("Invalid DIGICERT_REQUEST_TYPE: {0}".format(
+                request_type))
+
+        # Decide if we need to add 'multi_domain' to the uri for SAN certs
+        # certs.
+        if sub_alt_names:
+            if 'subAltNames' in sub_alt_names.keys():
+                names = sub_alt_names['subAltNames']['names']
+                current_app.logger.debug('Number of SubAltNames: %d' % len(
+                    names))
+                if len(names) > 0:
+                    current_app.logger.info('Cert Type: Multi-Domain SSL (SAN)')
+                    san_cert = True
+                else:
+                    current_app.logger.info('Cert Type: Simple SSL')
+                    san_cert = False
+            else:
+                san_cert = False
+        else:
+            san_cert = False
+
+        # Build the order URL from the decisions made above
+        if san_cert:
+            order_url = "ssl_multi_domain"
+        else:
+            order_url = "ssl_plus"
+
+        # Prefix "private" to the cert
+        if private_cert:
+            order_url = "private_{0}".format(order_url)
+
+        # Finally tack on the full URI path
+        order_url = "/order/certificate/{0}".format(order_url)
+
+        # Put together the full URL and return
+        url = "{0}{1}".format(digicert_url, order_url)
+        current_app.logger.info("Final Request URL: {0}".format(url))
+        return url
