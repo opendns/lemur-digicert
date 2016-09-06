@@ -19,6 +19,7 @@ from lemur_digicert import constants
 
 import json
 import time
+import re
 
 # DigiCert CertCentral (v2 API) Documentation
 # https://www.digicert.com/services/v2/documentation
@@ -312,6 +313,10 @@ class DigiCertIssuerPlugin(IssuerPlugin):
             order_url = "ssl_multi_domain"
         else:
             order_url = "ssl_plus"
+
+	# Support EV certificates
+	if 'EV_' in request_type:
+	    order_url = re.sub('^ssl_', 'ssl_ev_', order_url)
 
         # Prefix "private" to the cert
         if private_cert:
