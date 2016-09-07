@@ -19,6 +19,7 @@ from lemur_digicert import constants
 
 import json
 import time
+import re
 
 # DigiCert CertCentral (v2 API) Documentation
 # https://www.digicert.com/services/v2/documentation
@@ -37,7 +38,7 @@ def process_options(options, csr):
     data = {
         "certificate":
             {
-                "common_name": options['commonName'],
+                "common_name": options['common_name'],
                 "csr": csr,
                 "signature_hash":
                     current_app.config.get("DIGICERT_SIGNATURE_HASH"),
@@ -58,14 +59,14 @@ def process_options(options, csr):
                 current_app.config.get("DIGICERT_CA_CERT_ID")
 
     # add SANs if present
-    if options.get('extensions', 'subAltNames'):
+    if options.get('extensions', 'sub_alt_names'):
         dns_names = []
-        for san in options['extensions']['subAltNames']['names']:
+        for san in options['extensions']['sub_alt_names']['names']:
             dns_names.append(str(san['value']))
 
         data['certificate']['dns_names'] = dns_names
 
-    if options.get('validityEnd'):
+    if options.get('validity_end'):
         end_date, period = get_default_issuance(options)
         data['validity_years'] = period
 
@@ -78,11 +79,11 @@ def get_default_issuance(options):
     :param options:
     :return:
     """
-    end_date = arrow.get(options['validityEnd'])
+    end_date = arrow.get(options['validity_end'])
     specific_end_date = end_date.replace(days=-1).format("MM/DD/YYYY")
 
     now = arrow.utcnow()
-    then = arrow.get(options['validityEnd'])
+    then = arrow.get(options['validity_end'])
 
     if then < now.replace(years=+1):
         validity_period = '1'
@@ -144,7 +145,7 @@ class DigiCertIssuerPlugin(IssuerPlugin):
         # Build the proper API-URL for digicert
         request_type = current_app.config.get("DIGICERT_REQUEST_TYPE")
         digicert_url = current_app.config.get("DIGICERT_URL")
-        sub_alt_name = issuer_options.get('extensions', 'subAltName')
+        sub_alt_name = issuer_options.get('extensions', 'sub_alt_names')
         url = self.build_request_url(request_type, sub_alt_name, digicert_url)
 
         data = process_options(issuer_options, csr)
@@ -292,8 +293,8 @@ class DigiCertIssuerPlugin(IssuerPlugin):
         # Decide if we need to add 'multi_domain' to the uri for SAN certs
         # certs.
         if sub_alt_names:
-            if 'subAltNames' in sub_alt_names.keys():
-                names = sub_alt_names['subAltNames']['names']
+            if 'sub_alt_names' in sub_alt_names.keys():
+                names = sub_alt_names['sub_alt_names']['names']
                 current_app.logger.debug('Number of SubAltNames: %d' % len(
                     names))
                 if len(names) > 0:
@@ -312,6 +313,10 @@ class DigiCertIssuerPlugin(IssuerPlugin):
             order_url = "ssl_multi_domain"
         else:
             order_url = "ssl_plus"
+
+	# Support EV certificates
+	if 'EV_' in request_type:
+	    order_url = re.sub('^ssl_', 'ssl_ev_', order_url)
 
         # Prefix "private" to the cert
         if private_cert:
