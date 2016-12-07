@@ -70,6 +70,10 @@ def process_options(options, csr):
         end_date, period = get_default_issuance(options)
         data['validity_years'] = period
 
+    elif options.get('validity_years'):
+        if options['validity_years'] not in [1, 2, 3]:
+            raise Exception("Digicert issued certificates cannot exceed three years in validity")
+
     return data
 
 
